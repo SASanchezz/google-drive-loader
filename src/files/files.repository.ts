@@ -22,4 +22,12 @@ export class FilesRepository {
   async findOne(id: string): Promise<FileEntity> {
     return this.fileRepository.findOne({ where: { id } });
   }
+
+  async findByOriginalUrl(originalUrl: string): Promise<FileEntity> {
+    return this.fileRepository.findOne({ where: { originalUrl } });
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.fileRepository.delete(id);
+  }
 }

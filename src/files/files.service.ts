@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { FilesRepository } from './files.repository';
 import { GoogleDriveService } from '../google-drive/google-drive.service';
 import { FileDto } from './dto/file.dto';
@@ -22,6 +22,20 @@ export class FilesService {
     private googleDriveService: GoogleDriveService,
     private fileStreamerService: FileStreamerService,
   ) {}
+
+  async getAllFiles(): Promise<FileDto[]> {
+    return this.filesRepository.findAll();
+  }
+
+  async deleteFile(originalUrl: string): Promise<void> {
+    const file = await this.filesRepository.findByOriginalUrl(originalUrl);
+    if (file) {
+      await this.googleDriveService.deleteFile(file.googleDriveId);
+      await this.filesRepository.delete(file.id);
+    } else {
+      throw new NotFoundException(`File with URL ${originalUrl} not found`);
+    }
+  }
 
   async uploadFiles(urls: string[]): Promise<FileDto[]> {
     const results: FileDto[] = [];
@@ -62,10 +76,6 @@ export class FilesService {
       size: file.size,
       createdAt: file.createdAt,
     };
-  }
-
-    async getAllFiles(): Promise<FileDto[]> {
-    return this.filesRepository.findAll();
   }
 
   private async downloadAndUploadFile(url: string, uploadUri: string): Promise<GoogleFileMetadata> {

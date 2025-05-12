@@ -40,6 +40,17 @@ export class GoogleDriveService {
     });
   }
 
+  async deleteFile(fileId: string): Promise<void> {
+    try {
+      await this.drive.files.delete({
+        fileId,
+      });
+    } catch (error) {
+      console.error(`Error deleting file with ID ${fileId}:`, error);
+      throw error;
+    }
+  }
+
   public async initiateResumableUpload(): Promise<{ uploadUri: string }> {
     const response = await this.drive.files.create({
       uploadType: this.RESUMABLE_UPLOAD_TYPE,

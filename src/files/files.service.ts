@@ -4,6 +4,14 @@ import { GoogleDriveService } from '../google-drive/google-drive.service';
 import { FileDto } from './dto/file.dto';
 import { FileStreamerService } from 'src/file-streamer/file-streamer.service';
 
+interface GoogleFileMetadata {
+  mimeType: string,
+  fileSize: number,
+  uploadId: string,
+  webContentLink: string,
+  webViewLink: string,
+}
+
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name);
@@ -60,33 +68,26 @@ export class FilesService {
     return this.filesRepository.findAll();
   }
 
-  private async downloadAndUploadFile(url: string, uploadUri: string): Promise<{
-    mimeType: string,
-    fileSize: number,
-    uploadId: string,
-    webContentLink: string,
-    webViewLink: string,
-  }> {
+  private async downloadAndUploadFile(url: string, uploadUri: string): Promise<GoogleFileMetadata> {
     let buffer = Buffer.alloc(0);
     let offset = 0;
 
-    return await new Promise<{
-      mimeType: string,
-      fileSize: number,
-      uploadId: string,
-      webContentLink: string,
-      webViewLink: string,
-    }>(async (resolve, reject) => {
-
+    return await new Promise<GoogleFileMetadata>(async (resolve, reject) => {
       const { stream: response, mimeType, fileSize } = await this.fileStreamerService.getReadableData(url);
 
-      response.on('data', async (chunk: Buffer) => {
+      response.on('data', async (subChunk: Buffer) => {
         response.pause();
-        buffer = Buffer.concat([buffer, chunk]);
+        buffer = Buffer.concat([buffer, subChunk]);
 
         if (buffer.length >= this.CHUNK_SIZE) {
           try {
-            const { newRange } = await this.googleDriveService.uploadChunk(uploadUri, buffer, mimeType, offset, fileSize);
+            const { newRange } = await this.googleDriveService.uploadChunk({
+              uploadUri,
+              mimeType,
+              offset,
+              chunk: buffer,
+              totalSize: fileSize,
+            });
             
             buffer = buffer.subarray(newRange.end - offset + 1);
             offset = newRange.end + 1;
@@ -101,7 +102,13 @@ export class FilesService {
       response.on('end', async () => {
         if (buffer.length > 0) {
           try {
-            const res = await this.googleDriveService.uploadChunk(uploadUri, buffer, mimeType, offset, fileSize);
+            const res = await this.googleDriveService.uploadChunk({
+              uploadUri,
+              mimeType,
+              offset,
+              totalSize: fileSize,
+              chunk: buffer,
+            });
 
             await this.googleDriveService.shareFile(res.uploadId);
 

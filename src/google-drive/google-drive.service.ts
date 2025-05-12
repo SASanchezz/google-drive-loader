@@ -1,13 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { drive_v3, google } from 'googleapis';
 import * as path from 'path';
-import * as http from 'http';
 
 interface UploadFileParams {
-  name: string;
+  uploadUri: string;
+  chunk: Buffer;
   mimeType: string;
-  stream: http.IncomingMessage;
+  offset: number;
+  totalSize: number;
 }
+
+interface UploadFileResponse {
+  uploadId?: string;
+  newRange?: {
+    start: number;
+    end: number;
+  }
+}
+
 
 @Injectable()
 export class GoogleDriveService {
@@ -41,13 +51,8 @@ export class GoogleDriveService {
     return { uploadUri: response.headers.location };
   }
 
-  public async uploadChunk(uploadUri: string, chunk: Buffer, mimeType: string, offset: number, totalSize: number): Promise<{
-    uploadId?: string;
-    newRange?: {
-      start: number;
-      end: number;
-    }
-  }> {
+  public async uploadChunk(params: UploadFileParams): Promise<UploadFileResponse> {
+    const { uploadUri, chunk, mimeType, offset, totalSize } = params;
     const chunkLength = chunk.byteLength;
 
     try {
@@ -91,7 +96,6 @@ export class GoogleDriveService {
       },
     });
   }
-
 
   private getContentRange(offset: number, chunkLength: number, totalSize: number): string {
     return `bytes ${offset}-${offset + chunkLength - 1}/${totalSize}`

@@ -76,12 +76,31 @@ export class GoogleDriveService {
         if (response.newRange) {
           return response;
         }
-        
+
         if (!response.shouldRetry) {
           throw error;
         }
       }
     }
+  }
+
+  public async getFileMetadata(fileId: string): Promise<drive_v3.Schema$File> {
+    return this.drive.files
+      .get({
+        fileId,
+        fields: "id, mimeType, size, webContentLink, webViewLink",
+      })
+      .then(response => response.data);
+  }
+
+  public async shareFile(fileId: string): Promise<void> {
+    await this.drive.permissions.create({
+      fileId,
+      requestBody: {
+        role: "reader",
+        type: "anyone",
+      },
+    });
   }
   
   private async executeChunkUpload(params: UploadFileParams): Promise<UploadFileResponse> {
@@ -126,25 +145,6 @@ export class GoogleDriveService {
     }
   
     return { shouldRetry: false };
-  }
-
-  public async getFileMetadata(fileId: string): Promise<drive_v3.Schema$File> {
-    return this.drive.files
-      .get({
-        fileId,
-        fields: "id, mimeType, size, webContentLink, webViewLink",
-      })
-      .then(response => response.data);
-  }
-
-  public async shareFile(fileId: string): Promise<void> {
-    await this.drive.permissions.create({
-      fileId,
-      requestBody: {
-        role: "reader",
-        type: "anyone",
-      },
-    });
   }
 
   private getContentRange(offset: number, chunkLength: number, totalSize: number): string {

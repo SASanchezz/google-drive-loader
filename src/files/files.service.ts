@@ -1,15 +1,15 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { FilesRepository } from './files.repository';
-import { GoogleDriveService } from '../google-drive/google-drive.service';
-import { FileDto } from './dto/file.dto';
-import { FileStreamerService } from 'src/file-streamer/file-streamer.service';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { FilesRepository } from "./files.repository";
+import { GoogleDriveService } from "../google-drive/google-drive.service";
+import { FileDto } from "./dto/file.dto";
+import { FileStreamerService } from "src/file-streamer/file-streamer.service";
 
 interface GoogleFileMetadata {
-  mimeType: string,
-  fileSize: number,
-  uploadId: string,
-  webContentLink: string,
-  webViewLink: string,
+  mimeType: string;
+  fileSize: number;
+  uploadId: string;
+  webContentLink: string;
+  webViewLink: string;
 }
 
 @Injectable()
@@ -45,7 +45,10 @@ export class FilesService {
         const result = await this.processFileUpload(url);
         results.push(result);
       } catch (error) {
-        this.logger.error(`Failed to upload file from URL: ${url}`, error.stack);
+        this.logger.error(
+          `Failed to upload file from URL: ${url}`,
+          error.stack,
+        );
       }
     }
 
@@ -53,10 +56,12 @@ export class FilesService {
   }
 
   private async processFileUpload(url: string): Promise<FileDto> {
-    const { uploadUri } = await this.googleDriveService.initiateResumableUpload();
+    const { uploadUri } =
+      await this.googleDriveService.initiateResumableUpload();
 
-    const { mimeType, fileSize, uploadId, webContentLink, webViewLink } = await this.downloadAndUploadFile(url, uploadUri);
-    
+    const { mimeType, fileSize, uploadId, webContentLink, webViewLink } =
+      await this.downloadAndUploadFile(url, uploadUri);
+
     const file = await this.filesRepository.create({
       originalUrl: url,
       googleDriveId: uploadId,
@@ -78,14 +83,21 @@ export class FilesService {
     };
   }
 
-  private async downloadAndUploadFile(url: string, uploadUri: string): Promise<GoogleFileMetadata> {
+  private async downloadAndUploadFile(
+    url: string,
+    uploadUri: string,
+  ): Promise<GoogleFileMetadata> {
     let buffer = Buffer.alloc(0);
     let offset = 0;
 
     return await new Promise<GoogleFileMetadata>(async (resolve, reject) => {
-      const { stream: response, mimeType, fileSize } = await this.fileStreamerService.getReadableData(url);
+      const {
+        stream: response,
+        mimeType,
+        fileSize,
+      } = await this.fileStreamerService.getReadableData(url);
 
-      response.on('data', async (subChunk: Buffer) => {
+      response.on("data", async (subChunk: Buffer) => {
         response.pause();
         buffer = Buffer.concat([buffer, subChunk]);
 
@@ -98,7 +110,7 @@ export class FilesService {
               chunk: buffer,
               totalSize: fileSize,
             });
-            
+
             buffer = buffer.subarray(newRange.end - offset + 1);
             offset = newRange.end + 1;
           } catch (uploadError) {
@@ -109,7 +121,7 @@ export class FilesService {
         response.resume();
       });
 
-      response.on('end', async () => {
+      response.on("end", async () => {
         if (buffer.length > 0) {
           try {
             const res = await this.googleDriveService.uploadChunk({
@@ -122,9 +134,11 @@ export class FilesService {
 
             await this.googleDriveService.shareFile(res.uploadId);
 
-            const fileMetadata = await this.googleDriveService.getFileMetadata(res.uploadId);
+            const fileMetadata = await this.googleDriveService.getFileMetadata(
+              res.uploadId,
+            );
 
-            this.logger.log('File uploaded successfully:', fileMetadata);
+            this.logger.log("File uploaded successfully:", fileMetadata);
 
             buffer = Buffer.alloc(0); // Reset buffer after upload
 
@@ -141,8 +155,8 @@ export class FilesService {
         }
       });
 
-      response.on('error', (err) => {
-        this.logger.error('Error downloading file:', err);
+      response.on("error", (err) => {
+        this.logger.error("Error downloading file:", err);
         reject(err);
       });
     });

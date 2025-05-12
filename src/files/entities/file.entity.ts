@@ -1,28 +1,33 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+} from "typeorm";
 
-@Entity({ name: 'files' })
+@Entity({ name: "files" })
 export class FileEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ name: 'original_url' })
+  @Column({ name: "original_url" })
   originalUrl: string;
 
-  @Column({ name: 'google_drive_id' })
+  @Column({ name: "google_drive_id" })
   googleDriveId: string;
 
-  @Column({ name: 'google_drive_view_url' })
+  @Column({ name: "google_drive_view_url" })
   googleDriveViewUrl: string;
 
-  @Column({ name: 'google_drive_download_url' })
+  @Column({ name: "google_drive_download_url" })
   googleDriveDownloadUrl: string;
 
-  @Column({ name: 'mime_type' })
+  @Column({ name: "mime_type" })
   mimeType: string;
 
-  @Column('bigint')
+  @Column("bigint")
   size: number;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 }

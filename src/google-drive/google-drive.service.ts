@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { drive_v3, google } from "googleapis";
 import * as path from "path";
+import { GoogleDriveError } from "./google-drive.error";
 
 interface UploadFileParams {
   uploadUri: string;
@@ -12,6 +13,7 @@ interface UploadFileParams {
 
 interface UploadFileResponse {
   uploadId?: string;
+  shouldRetry?: boolean;
   newRange?: {
     start: number;
     end: number;
@@ -66,34 +68,64 @@ export class GoogleDriveService {
   }
 
   public async uploadChunk(params: UploadFileParams): Promise<UploadFileResponse> {
+    while (true) {
+      try {
+        return await this.executeChunkUpload(params);
+      } catch (error) {
+        const response = this.handleUploadError(error);
+        if (response.newRange) {
+          return response;
+        }
+        
+        if (!response.shouldRetry) {
+          throw error;
+        }
+      }
+    }
+  }
+  
+  private async executeChunkUpload(params: UploadFileParams): Promise<UploadFileResponse> {
     const { uploadUri, chunk, mimeType, offset, totalSize } = params;
     const chunkLength = chunk.byteLength;
 
-    try {
-      const response = await this.drive.files.create(
-        {},
-        {
-          method: "PUT",
-          url: uploadUri,
-          headers: {
-            "Content-Length": chunkLength,
-            "Content-Range": this.getContentRange(offset, chunkLength, totalSize),
-            "Content-Type": mimeType,
-          },
-          body: chunk,
+    const response = await this.drive.files.create(
+      {},
+      {
+        method: "PUT",
+        url: uploadUri,
+        headers: {
+          "Content-Length": chunkLength,
+          "Content-Range": this.getContentRange(offset, chunkLength, totalSize),
+          "Content-Type": mimeType,
         },
-      );
-
-      return Promise.resolve({ uploadId: response.data.id });
-    } catch (error) {
-      if (error.response && error.response.status === 308) {
-        const range: string = error.response.headers["range"];
-
-        return Promise.resolve({ newRange: this.parseRange(range) });
-      } else {
-        throw error;
-      }
+        body: chunk,
+      },
+    );
+  
+    return { uploadId: response.data.id };
+  }
+  
+  private handleUploadError(error: any): UploadFileResponse {
+    if (!error.response) {
+      throw error;
     }
+  
+    const { status, headers } = error.response;
+  
+    if (status === 308) {
+      const range = headers["range"];
+      return { newRange: this.parseRange(range) };
+    }
+  
+    if (status === 404) {
+      throw new GoogleDriveError("Upload session has expired and the upload must be restarted from the beginning");
+    }
+  
+    if (status >= 500) {
+      return { shouldRetry: true };
+    }
+  
+    return { shouldRetry: false };
   }
 
   public async getFileMetadata(fileId: string): Promise<drive_v3.Schema$File> {

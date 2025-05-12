@@ -1,9 +1,10 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { FileStreamerService } from "src/file-streamer/file-streamer.service";
 import { GoogleDriveService } from "../google-drive/google-drive.service";
 import { UploadedFilesDto } from "./dto/uploaded-files.dto";
 import { FilesRepository } from "./files.repository";
 import { FileDto } from "./dto/file.dto";
+import { GoogleDriveError } from "src/google-drive/google-drive.error";
 
 interface GoogleFileMetadata {
   mimeType: string;
@@ -15,7 +16,7 @@ interface GoogleFileMetadata {
 
 @Injectable()
 export class FilesService {
-  private readonly logger = new Logger(FilesService.name);
+  private readonly MAX_ATTEMPTS = 3
   private readonly CHUNK_SIZE = 256 * 1024; // 256KB
 
   constructor(
@@ -40,24 +41,39 @@ export class FilesService {
 
   public async uploadFiles(urls: string[]): Promise<UploadedFilesDto> {
     const results: UploadedFilesDto = {};
-
+  
     for (const url of urls) {
-      try {
-        const result = await this.processFileUpload(url);
-        results[url] = result;
-      } catch (error) {
-        results[url] = "Failed to upload: " + error.message;
-      }
+      results[url] = await this.uploadFileWithRetries(url);
     }
-
+  
     return results;
   }
+  
+  private async uploadFileWithRetries(url: string): Promise<FileDto | string> {
+    let attempts = 0;
+  
+    while (attempts < this.MAX_ATTEMPTS) {
+      try {
+        return await this.attemptFileUpload(url);
+      } catch (error) {
+        if (++attempts >= this.MAX_ATTEMPTS) {
+          return `Failed to upload: Maximum attempts (${this.MAX_ATTEMPTS}) reached`;
+        }
+  
+        if (error instanceof GoogleDriveError) {
+          continue;
+        }
+  
+        return `Failed to upload: ${error.message}`;
+      }
+    }
+  }
 
-  private async processFileUpload(url: string): Promise<FileDto> {
+  private async attemptFileUpload(url: string): Promise<FileDto> {
     const { uploadUri } = await this.googleDriveService.initiateResumableUpload();
 
     const { mimeType, fileSize, uploadId, webContentLink, webViewLink } =
-      await this.downloadAndUploadFile(url, uploadUri);
+      await this.uploadToGoogleDisk(url, uploadUri);
 
     return await this.filesRepository.create({
       originalUrl: url,
@@ -69,20 +85,16 @@ export class FilesService {
     });
   }
 
-  private async downloadAndUploadFile(url: string, uploadUri: string): Promise<GoogleFileMetadata> {
+  private async uploadToGoogleDisk(url: string, uploadUri: string): Promise<GoogleFileMetadata> {
     let buffer = Buffer.alloc(0);
     let offset = 0;
 
     return await new Promise<GoogleFileMetadata>(async (resolve, reject) => {
       try {
-        const {
-          stream: response,
-          mimeType,
-          fileSize,
-        } = await this.fileStreamerService.getReadableData(url);
+        const { stream, mimeType, fileSize } = await this.fileStreamerService.getReadableData(url);
   
-        response.on("data", async (subChunk: Buffer) => {
-          response.pause();
+        stream.on("data", async (subChunk: Buffer) => {
+          stream.pause();
           buffer = Buffer.concat([buffer, subChunk]);
   
           if (buffer.length >= this.CHUNK_SIZE) {
@@ -99,16 +111,18 @@ export class FilesService {
               offset = newRange.end + 1;
             } catch (uploadError) {
               reject(uploadError);
+              stream.destroy();
+              return;
             }
           }
   
-          response.resume();
+          stream.resume();
         });
   
-        response.on("end", async () => {
+        stream.on("end", async () => {
           if (buffer.length > 0) {
             try {
-              const res = await this.googleDriveService.uploadChunk({
+              const response = await this.googleDriveService.uploadChunk({
                 uploadUri,
                 mimeType,
                 offset,
@@ -116,11 +130,11 @@ export class FilesService {
                 chunk: buffer,
               });
   
-              await this.googleDriveService.shareFile(res.uploadId);
+              await this.googleDriveService.shareFile(response.uploadId);
   
-              const fileMetadata = await this.googleDriveService.getFileMetadata(res.uploadId);
+              const fileMetadata = await this.googleDriveService.getFileMetadata(response.uploadId);
   
-              buffer = Buffer.alloc(0); // Reset buffer after upload
+              buffer = Buffer.alloc(0);
   
               resolve({
                 mimeType,
@@ -131,11 +145,13 @@ export class FilesService {
               });
             } catch (uploadError) {
               reject(uploadError);
+              stream.destroy();
+              return;
             }
           }
         });
   
-        response.on("error", reject);
+        stream.on("error", reject);
 
       } catch (error) {
         reject(error)

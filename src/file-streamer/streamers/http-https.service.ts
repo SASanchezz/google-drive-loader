@@ -11,8 +11,7 @@ export class HttpHttpService implements Streamer {
     const protocol = url.startsWith("https") ? https : http;
 
     return new Promise((resolve, reject) => {
-      protocol
-        .get(url, response => {
+      protocol.get(url, response => {
           const { statusCode, headers } = response;
           if (statusCode >= 400) {
             response.resume();

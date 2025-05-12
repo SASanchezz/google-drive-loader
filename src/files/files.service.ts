@@ -1,9 +1,9 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { FilesRepository } from "./files.repository";
-import { GoogleDriveService } from "../google-drive/google-drive.service";
-import { FileDto } from "./dto/file.dto";
 import { FileStreamerService } from "src/file-streamer/file-streamer.service";
+import { GoogleDriveService } from "../google-drive/google-drive.service";
 import { UploadedFilesDto } from "./dto/uploaded-files.dto";
+import { FilesRepository } from "./files.repository";
+import { FileDto } from "./dto/file.dto";
 
 interface GoogleFileMetadata {
   mimeType: string;

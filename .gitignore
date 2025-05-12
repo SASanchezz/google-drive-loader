@@ -20,3 +20,4 @@
 
 # environment variable files
 .env
+service-account-key.json

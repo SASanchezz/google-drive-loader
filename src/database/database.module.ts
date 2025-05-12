@@ -15,7 +15,8 @@ import { Module } from "@nestjs/common";
         password: configService.getOrThrow('DB_PASSWORD'),
         database: configService.getOrThrow('DB_NAME'),
         entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-        synchronize: false,
+        autoLoadEntities: true,
+        synchronize: configService.getOrThrow('DB_SYNCHRONIZE') === 'true',
       }),
     })
   ]

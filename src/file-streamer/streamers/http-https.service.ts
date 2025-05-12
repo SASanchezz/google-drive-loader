@@ -3,35 +3,30 @@ import * as https from "https";
 import * as http from "http";
 
 import { ReadableData } from "../contracts/ReadableData";
+import { Streamer } from "../contracts/Streamer";
 
 @Injectable()
-export class HttpHttpService {
-  async getReadableData(url: string): Promise<ReadableData> {
+export class HttpHttpService implements Streamer {
+  public async getReadableData(url: string): Promise<ReadableData> {
     const protocol = url.startsWith("https") ? https : http;
 
     return new Promise((resolve, reject) => {
       protocol
-        .get(url, (response) => {
+        .get(url, response => {
           const { statusCode, headers } = response;
           if (statusCode >= 400) {
             response.resume();
-            return reject(
-              new BadRequestException(
+            return reject(new BadRequestException (
                 `Failed to download file, status code: ${response.statusCode}`,
               ),
             );
           }
-          const mimeType =
-            headers["content-type"] || "application/octet-stream";
+          const mimeType = headers["content-type"] || "application/octet-stream";
           const fileSize = parseInt(headers["content-length"] || "0", 10);
 
           if (!fileSize || fileSize < 0) {
             response.resume();
-            return reject(
-              new BadRequestException(
-                "Content-Length header is missing or invalid",
-              ),
-            );
+            return reject(new BadRequestException("Content-Length header is missing or invalid"));
           }
 
           resolve({
@@ -40,7 +35,7 @@ export class HttpHttpService {
             fileSize,
           });
         })
-        .on("error", reject);
+        .on("error", reject)
     });
   }
 }

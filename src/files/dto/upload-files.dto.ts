@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsArray, IsUrl, ArrayMinSize } from "class-validator";
+import { IsSet } from "src/validators/IsSet";
 
 export class UploadFilesDto {
   @ApiProperty({
@@ -14,5 +15,6 @@ export class UploadFilesDto {
   @IsArray()
   @ArrayMinSize(1)
   @IsUrl({}, { each: true })
+  @IsSet()
   urls: string[];
 }

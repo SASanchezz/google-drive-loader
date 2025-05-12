@@ -8,11 +8,7 @@ import { FileEntity } from "./entities/file.entity";
 import { FileStreamerModule } from "src/file-streamer/file-streamer.module";
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([FileEntity]),
-    GoogleDriveModule,
-    FileStreamerModule,
-  ],
+  imports: [TypeOrmModule.forFeature([FileEntity]), GoogleDriveModule, FileStreamerModule],
   providers: [FilesService, FilesRepository],
   controllers: [FilesController],
 })

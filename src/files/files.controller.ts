@@ -1,18 +1,10 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  HttpStatus,
-  HttpCode,
-  Delete,
-  Query,
-} from "@nestjs/common";
+import { Controller, Post, Get, Body, HttpStatus, HttpCode, Delete, Query } from "@nestjs/common";
 import { FilesService } from "./files.service";
 import { UploadFilesDto } from "./dto/upload-files.dto";
 import { FileDto } from "./dto/file.dto";
 import { ApiOperation } from "@nestjs/swagger";
 import { DeleteFileDto } from "./dto/delete-file.dto";
+import { UploadedFilesDto } from "./dto/uploaded-files.dto";
 
 @Controller("files")
 export class FilesController {
@@ -21,9 +13,7 @@ export class FilesController {
   @ApiOperation({ summary: "Upload files into Google Drive" })
   @Post("upload")
   @HttpCode(HttpStatus.ACCEPTED)
-  async uploadFiles(
-    @Body() uploadFilesDto: UploadFilesDto,
-  ): Promise<FileDto[]> {
+  async uploadFiles(@Body() uploadFilesDto: UploadFilesDto): Promise<UploadedFilesDto> {
     return this.filesService.uploadFiles(uploadFilesDto.urls);
   }
 

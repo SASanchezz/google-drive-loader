@@ -20,10 +20,7 @@ interface UploadFileResponse {
 
 @Injectable()
 export class GoogleDriveService {
-  private readonly AUTH_KEY_FILE = path.join(
-    __dirname,
-    "../../service-account-key.json",
-  );
+  private readonly AUTH_KEY_FILE = path.join(__dirname, "../../service-account-key.json");
   private readonly AUTH_SCOPES = ["https://www.googleapis.com/auth/drive"];
   private readonly RESUMABLE_UPLOAD_TYPE = "resumable";
   private readonly UPLOAD_URI =
@@ -43,7 +40,7 @@ export class GoogleDriveService {
     });
   }
 
-  async deleteFile(fileId: string): Promise<void> {
+  public async deleteFile(fileId: string): Promise<void> {
     try {
       await this.drive.files.delete({
         fileId,
@@ -68,9 +65,7 @@ export class GoogleDriveService {
     return { uploadUri: response.headers.location };
   }
 
-  public async uploadChunk(
-    params: UploadFileParams,
-  ): Promise<UploadFileResponse> {
+  public async uploadChunk(params: UploadFileParams): Promise<UploadFileResponse> {
     const { uploadUri, chunk, mimeType, offset, totalSize } = params;
     const chunkLength = chunk.byteLength;
 
@@ -82,11 +77,7 @@ export class GoogleDriveService {
           url: uploadUri,
           headers: {
             "Content-Length": chunkLength,
-            "Content-Range": this.getContentRange(
-              offset,
-              chunkLength,
-              totalSize,
-            ),
+            "Content-Range": this.getContentRange(offset, chunkLength, totalSize),
             "Content-Type": mimeType,
           },
           body: chunk,
@@ -111,7 +102,7 @@ export class GoogleDriveService {
         fileId,
         fields: "id, mimeType, size, webContentLink, webViewLink",
       })
-      .then((response) => response.data);
+      .then(response => response.data);
   }
 
   public async shareFile(fileId: string): Promise<void> {
@@ -124,11 +115,7 @@ export class GoogleDriveService {
     });
   }
 
-  private getContentRange(
-    offset: number,
-    chunkLength: number,
-    totalSize: number,
-  ): string {
+  private getContentRange(offset: number, chunkLength: number, totalSize: number): string {
     return `bytes ${offset}-${offset + chunkLength - 1}/${totalSize}`;
   }
 
